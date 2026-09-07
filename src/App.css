@@ -1,0 +1,51 @@
+.welcome-screen {
+  box-sizing: border-box;
+  display: grid;
+  min-height: 100svh;
+  place-items: center;
+  padding: 24px;
+}
+
+.welcome-card {
+  width: min(100%, 360px);
+  padding: 42px 28px;
+  text-align: center;
+}
+
+.welcome-icon {
+  display: block;
+  font-size: 56px;
+  line-height: 1;
+  margin-bottom: 24px;
+}
+
+.eyebrow {
+  color: #907c75;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  margin: 0 0 8px;
+}
+
+h1 {
+  color: #403633;
+  font-size: clamp(32px, 9vw, 40px);
+  letter-spacing: 0.04em;
+  margin: 0;
+}
+
+.message {
+  color: #6f625d;
+  font-size: 16px;
+  line-height: 1.8;
+  margin: 28px 0;
+}
+
+.status {
+  background: #f3e8e1;
+  border-radius: 999px;
+  color: #805e51;
+  display: inline-block;
+  font-size: 14px;
+  margin: 0;
+  padding: 9px 16px;
+}
