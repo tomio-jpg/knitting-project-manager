@@ -1,0 +1,1 @@
+if('serviceWorker' in navigator) {window.addEventListener('load', () => {navigator.serviceWorker.register('/knitting-project-manager/sw.js', { scope: '/knitting-project-manager/' })})}
