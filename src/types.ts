@@ -17,6 +17,10 @@ export type Project = {
   counterSettings?: CounterSettings
   timer?: TimerState
   lastTimerDurationSeconds?: number
+  lastTimerSession?: {
+    durationSeconds: number
+    endedAt: string
+  }
 }
 
 export type CounterSettings = {
