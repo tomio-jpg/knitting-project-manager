@@ -16,6 +16,7 @@ export type Project = {
   completedAt?: string
   counterSettings?: CounterSettings
   timer?: TimerState
+  lastTimerDurationSeconds?: number
 }
 
 export type CounterSettings = {
