@@ -76,3 +76,26 @@ textarea { line-height: 1.6; resize: vertical; }
 .coming-soon { color: #887a74; font-size: 13px; line-height: 1.6; margin: 24px 8px; }
 
 @media (min-width: 641px) { .form-page { background: #fff; border-left: 1px solid #eee3dc; border-right: 1px solid #eee3dc; } }
+
+.hint,.settings-intro,.muted { color:#887a74; font-size:13px; line-height:1.6; }
+.complete-button { background:transparent; border:1px solid #c78478; border-radius:12px; color:#a66258; font:inherit; margin-top:22px; min-height:46px; width:100%; }
+.complete-status { color:#80615a; font-size:14px; margin-top:22px; }
+.gear { background:transparent; border:0; color:#80615a; font-size:25px; padding:7px; }
+.counter-page { padding-left:14px; padding-right:14px; }
+.counter-grid { display:grid; gap:10px; grid-template-columns:1fr 1fr; }
+.counter-unit { background:#fff; border:1px solid #eaded7; border-radius:18px; min-width:0; padding:17px 10px 12px; text-align:center; }
+.counter-unit h2 { color:#80615a; font-size:14px; margin-bottom:8px; }
+.count-value { color:#403633; margin:0 0 15px; white-space:nowrap; }
+.count-value b { font-size:42px; letter-spacing:-.04em; }
+.count-value span { color:#80615a; font-size:13px; margin-left:3px; }
+.count-buttons,.adjust-buttons { display:flex; flex-wrap:wrap; gap:7px; justify-content:center; }
+.count-buttons button,.adjust-buttons button { background:#f7ede8; border:0; border-radius:12px; color:#805e51; flex:1 0 38%; font:inherit; font-size:16px; font-weight:700; min-height:52px; padding:8px; }
+.count-buttons .main-count { background:#c78478; color:white; flex-basis:100%; font-size:21px; min-height:68px; }
+.adjust-toggle { background:transparent; border:0; color:#907c75; font:inherit; font-size:13px; margin:9px 0 4px; padding:6px; }
+.undo-button { background:#fff; border:1px solid #dfd2ca; border-radius:13px; color:#6f625d; font:inherit; margin-top:13px; min-height:48px; width:100%; }
+.timer-notice { color:#9a6c60; font-size:12px; margin:8px 4px 0; text-align:center; }
+.timer-card { align-items:center; background:#f3e8e1; border-radius:16px; display:flex; gap:12px; justify-content:space-between; margin-top:17px; padding:13px; }
+.timer-card small { color:#80615a; display:block; font-size:12px; }.timer-card strong { color:#514440; display:block; font-size:19px; margin-top:3px; }.timer-actions { display:flex; flex-wrap:wrap; gap:5px; justify-content:flex-end; }.timer-card button { background:#fff; border:0; border-radius:9px; color:#805e51; font:inherit; font-size:12px; min-height:33px; padding:6px 8px; }
+.recent { margin-top:25px; }.history-list { background:#fff; border:1px solid #eee3dc; border-radius:14px; overflow:hidden; }.history-row { border-bottom:1px solid #f0e7e1; display:grid; gap:10px; grid-template-columns:46px 1fr; padding:12px; }.history-row:last-child { border-bottom:0; }.history-row time { color:#907c75; font-size:12px; padding-top:2px; }.history-row span { display:grid; gap:3px; }.history-row strong { color:#514440; font-size:13px; font-weight:600; }.history-row small { color:#887a74; font-size:12px; }
+.setting-group { border:1px solid #eee3dc; border-radius:15px; margin:16px 0; overflow:hidden; }.setting-group h2 { color:#514440; font-size:15px; margin:0; padding:14px; }.setting-row { align-items:center; border-top:1px solid #f0e7e1; display:flex; justify-content:space-between; padding:10px 14px; }.setting-row strong { color:#805e51; font-size:16px; }.setting-row span { display:flex; gap:5px; }.setting-row button,.add-custom button { background:#f7ede8; border:0; border-radius:8px; color:#805e51; font:inherit; font-size:12px; min-height:32px; padding:5px 8px; }.setting-row button:disabled { opacity:.35; }.add-custom { border-top:1px solid #f0e7e1; display:flex; gap:8px; padding:10px 14px; }.add-custom input { min-height:34px; padding:6px 9px; }.add-custom button { min-width:52px; }.history-day { margin-top:22px; }.history-day h2 { color:#80615a; font-size:15px; }
+.modal { align-items:center; background:#0005; display:flex; inset:0; justify-content:center; padding:22px; position:fixed; z-index:10; }.modal>div { background:#fff; border-radius:20px; max-width:360px; padding:24px; text-align:center; width:100%; }.modal h2 { color:#403633; font-size:21px; }.modal p { color:#6f625d; line-height:1.7; }.modal-cancel { display:block; margin:8px auto 0; }

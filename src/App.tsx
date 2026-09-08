@@ -1,230 +1,55 @@
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react'
 import { db } from './db'
-import type { Project, ProjectPhoto } from './types'
+import type { CountHistory, CounterOperation, CounterSettings, Project, ProjectPhoto, TimerState } from './types'
 import './App.css'
 
-type Screen = 'home' | 'projects' | 'new-project' | 'project'
-
-type DraftProject = {
-  title: string
-  targetRow: string
-  targetStitch: string
-  autoAdvanceAtTargetStitch: boolean
-  memo: string
-  nextAction: string
-  registerInProgress: boolean
-  currentRow: string
-  currentStitch: string
-}
-
-const emptyDraft = (): DraftProject => ({
-  title: '',
-  targetRow: '',
-  targetStitch: '',
-  autoAdvanceAtTargetStitch: false,
-  memo: '',
-  nextAction: '',
-  registerInProgress: false,
-  currentRow: '0',
-  currentStitch: '0',
-})
+type Screen = 'home' | 'projects' | 'new-project' | 'project' | 'counter' | 'settings' | 'history'
+type Draft = { title: string; targetRow: string; targetStitch: string; auto: boolean; memo: string; next: string; midway: boolean; row: string; stitch: string }
+const freshDraft = (): Draft => ({ title:'', targetRow:'', targetStitch:'', auto:false, memo:'', next:'', midway:false, row:'1', stitch:'0' })
+const standard: CounterSettings = { rowIncrease:[1], rowDecrease:[1], stitchIncrease:[1,5,10], stitchDecrease:[1,5,10] }
+const settingsOf = (project: Project): CounterSettings => project.counterSettings ?? standard
+const n = (value:string) => Math.max(0, Number.parseInt(value,10)||0)
+const optional = (value:string) => value === '' ? null : n(value)
+const id = () => crypto.randomUUID()
 
 function App() {
-  const [screen, setScreen] = useState<Screen>('home')
-  const [projects, setProjects] = useState<Project[]>([])
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
-  const [photos, setPhotos] = useState<ProjectPhoto[]>([])
-  const [draft, setDraft] = useState<DraftProject>(emptyDraft)
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
-  const [isSaving, setIsSaving] = useState(false)
-  const [notice, setNotice] = useState('')
-
-  const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? null
-  const previewUrls = useMemo(
-    () => selectedFiles.map((file) => ({ file, url: URL.createObjectURL(file) })),
-    [selectedFiles],
-  )
-  const savedPhotoUrls = useMemo(
-    () => photos.map((photo) => ({ photo, url: URL.createObjectURL(photo.blob) })),
-    [photos],
-  )
-
-  useEffect(() => {
-    return () => {
-      previewUrls.forEach(({ url }) => URL.revokeObjectURL(url))
-    }
-  }, [previewUrls])
-
-  useEffect(() => {
-    return () => {
-      savedPhotoUrls.forEach(({ url }) => URL.revokeObjectURL(url))
-    }
-  }, [savedPhotoUrls])
-
-  useEffect(() => {
-    void loadProjects()
-  }, [])
-
-  useEffect(() => {
-    if (!selectedProjectId) return
-    void db.projectPhotos.where('projectId').equals(selectedProjectId).sortBy('createdAt').then(setPhotos)
-  }, [selectedProjectId])
-
-  async function loadProjects() {
-    const savedProjects = await db.projects.orderBy('updatedAt').reverse().toArray()
-    setProjects(savedProjects)
-  }
-
-  function updateDraft<Key extends keyof DraftProject>(key: Key, value: DraftProject[Key]) {
-    setDraft((current) => ({ ...current, [key]: value }))
-  }
-
-  function selectPhotos(event: ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(event.target.files ?? []).filter((file) => file.type.startsWith('image/'))
-    setSelectedFiles((current) => [...current, ...files])
-    event.target.value = ''
-  }
-
-  function removeSelectedFile(index: number) {
-    setSelectedFiles((current) => current.filter((_, currentIndex) => currentIndex !== index))
-  }
-
-  function openNewProject() {
-    setDraft(emptyDraft())
-    setSelectedFiles([])
-    setNotice('')
-    setScreen('new-project')
-  }
-
-  async function saveProject(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    const title = draft.title.trim()
-    if (!title) {
-      setNotice('作品名を入力してください。')
-      return
-    }
-
-    setIsSaving(true)
-    setNotice('')
-    const now = new Date().toISOString()
-    const project: Project = {
-      id: crypto.randomUUID(),
-      title,
-      status: 'in-progress',
-      createdAt: now,
-      updatedAt: now,
-      targetRow: parseOptionalNumber(draft.targetRow),
-      targetStitch: parseOptionalNumber(draft.targetStitch),
-      autoAdvanceAtTargetStitch: Boolean(draft.targetStitch) && draft.autoAdvanceAtTargetStitch,
-      memo: draft.memo.trim(),
-      nextAction: draft.nextAction.trim(),
-      currentRow: draft.registerInProgress ? parseCount(draft.currentRow) : 0,
-      currentStitch: draft.registerInProgress ? parseCount(draft.currentStitch) : 0,
-    }
-
-    try {
-      await db.transaction('rw', db.projects, db.projectPhotos, async () => {
-        await db.projects.add(project)
-        await db.projectPhotos.bulkAdd(
-          selectedFiles.map((file) => ({
-            id: crypto.randomUUID(),
-            projectId: project.id,
-            blob: file,
-            fileName: file.name,
-            createdAt: now,
-          })),
-        )
-      })
-      await loadProjects()
-      setSelectedProjectId(project.id)
-      setSelectedFiles([])
-      setScreen('project')
-    } catch {
-      setNotice('保存できませんでした。iPhoneの空き容量を確認して、もう一度お試しください。')
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  function openProject(projectId: string) {
-    setSelectedProjectId(projectId)
-    setScreen('project')
-  }
-
-  const inProgressProjects = projects.filter((project) => project.status === 'in-progress')
-
-  return (
-    <div className="app-shell">
-      {screen === 'home' && (
-        <HomeScreen
-          projects={inProgressProjects}
-          onAddProject={openNewProject}
-          onOpenProjects={() => setScreen('projects')}
-          onOpenProject={openProject}
-        />
-      )}
-      {screen === 'projects' && (
-        <ProjectsScreen projects={inProgressProjects} onBack={() => setScreen('home')} onAddProject={openNewProject} onOpenProject={openProject} />
-      )}
-      {screen === 'new-project' && (
-        <NewProjectScreen
-          draft={draft}
-          files={previewUrls}
-          isSaving={isSaving}
-          notice={notice}
-          onCancel={() => setScreen(projects.length ? 'projects' : 'home')}
-          onSubmit={saveProject}
-          onUpdate={updateDraft}
-          onSelectPhotos={selectPhotos}
-          onRemovePhoto={removeSelectedFile}
-        />
-      )}
-      {screen === 'project' && selectedProject && (
-        <ProjectScreen project={selectedProject} photos={savedPhotoUrls} onBack={() => setScreen('projects')} />
-      )}
-    </div>
-  )
+  const [screen,setScreen]=useState<Screen>('home'), [projects,setProjects]=useState<Project[]>([]), [projectId,setProjectId]=useState<string|null>(null)
+  const [photos,setPhotos]=useState<ProjectPhoto[]>([]), [history,setHistory]=useState<CountHistory[]>([]), [draft,setDraft]=useState<Draft>(freshDraft), [files,setFiles]=useState<File[]>([]), [notice,setNotice]=useState(''), [pending,setPending]=useState<null|{amount:number; beforeRow:number; beforeStitch:number; afterRow:number; afterStitch:number; rows:number}>(null)
+  const project=projects.find(x=>x.id===projectId) ?? null
+  const fileUrls=useMemo(()=>files.map(file=>({file,url:URL.createObjectURL(file)})),[files]); const photoUrls=useMemo(()=>photos.map(photo=>({photo,url:URL.createObjectURL(photo.blob)})),[photos])
+  useEffect(()=>()=>fileUrls.forEach(x=>URL.revokeObjectURL(x.url)),[fileUrls]); useEffect(()=>()=>photoUrls.forEach(x=>URL.revokeObjectURL(x.url)),[photoUrls])
+  useEffect(()=>{ void loadProjects() },[]); useEffect(()=>{ if(projectId) void loadProjectData(projectId) },[projectId])
+  async function loadProjects(){ setProjects(await db.projects.orderBy('updatedAt').reverse().toArray()) }
+  async function loadProjectData(pid:string){ setPhotos(await db.projectPhotos.where('projectId').equals(pid).sortBy('createdAt')); setHistory((await db.countHistory.where('projectId').equals(pid).reverse().sortBy('createdAt')).reverse()) }
+  function openProject(pid:string, next:Screen='project'){setProjectId(pid);setScreen(next)}
+  function newProject(){setDraft(freshDraft());setFiles([]);setNotice('');setScreen('new-project')}
+  async function saveProject(e:FormEvent){e.preventDefault();if(!draft.title.trim()){setNotice('作品名を入力してください。');return} const now=new Date().toISOString();const p:Project={id:id(),title:draft.title.trim(),status:'in-progress',createdAt:now,updatedAt:now,targetRow:optional(draft.targetRow),targetStitch:optional(draft.targetStitch),autoAdvanceAtTargetStitch:!!draft.targetStitch&&draft.auto,memo:draft.memo.trim(),nextAction:draft.next.trim(),currentRow:draft.midway?n(draft.row):1,currentStitch:draft.midway?n(draft.stitch):0};try{await db.transaction('rw',db.projects,db.projectPhotos,async()=>{await db.projects.add(p);await db.projectPhotos.bulkAdd(files.map(file=>({id:id(),projectId:p.id,blob:file,fileName:file.name,createdAt:now}))) });await loadProjects();openProject(p.id)}catch{setNotice('保存できませんでした。端末の空き容量を確認してください。')}}
+  async function applyCount(kind:'row'|'stitch', amount:number){if(!project)return;const beforeRow=project.currentRow,beforeStitch=project.currentStitch;let afterRow=beforeRow,afterStitch=beforeStitch,autoRows=0;if(kind==='row'){afterRow=Math.max(0,beforeRow+amount);if(amount>0)afterStitch=0}else{const total=Math.max(0,beforeStitch+amount);if(amount>0&&project.autoAdvanceAtTargetStitch&&project.targetStitch){autoRows=Math.floor(total/project.targetStitch);afterRow+=autoRows;afterStitch=total%project.targetStitch}else afterStitch=total}if(kind==='stitch'&&autoRows>=2){setPending({amount,beforeRow,beforeStitch,afterRow,afterStitch,rows:autoRows});return}await commitCount(kind,amount,beforeRow,beforeStitch,afterRow,afterStitch,autoRows)}
+  async function commitCount(kind:'row'|'stitch',amount:number,beforeRow:number,beforeStitch:number,afterRow:number,afterStitch:number,autoRows=0){if(!project)return;const now=new Date().toISOString();const label=kind==='row'?`段 ${amount>0?'+':''}${amount}${amount>0?'（手動段送り）':''}`:`目 ${amount>0?'+':''}${amount}${autoRows?` → 自動で${autoRows}段進む`:''}`;const h:CountHistory={id:id(),projectId:project.id,createdAt:now,kind:'count',label,beforeRow,beforeStitch,afterRow,afterStitch,autoAdvanceRows:autoRows||undefined};const op:CounterOperation={id:id(),projectId:project.id,createdAt:now,beforeRow,beforeStitch,afterRow,afterStitch,undone:false};await db.transaction('rw',db.projects,db.countHistory,db.counterOperations,async()=>{await db.projects.update(project.id,{currentRow:afterRow,currentStitch:afterStitch,updatedAt:now});await db.countHistory.add(h);await db.counterOperations.add(op)});await loadProjects();await loadProjectData(project.id);if(!project.timer||project.timer.state==='paused')setNotice('制作タイマーは停止中です')}
+  async function undo(){if(!project)return;const op=(await db.counterOperations.where('projectId').equals(project.id).filter(x=>!x.undone&&x.afterRow===project.currentRow&&x.afterStitch===project.currentStitch).reverse().sortBy('createdAt'))[0];if(!op){setNotice('取り消せる直前の操作はありません。');return}const now=new Date().toISOString();await db.transaction('rw',db.projects,db.counterOperations,db.countHistory,async()=>{await db.projects.update(project.id,{currentRow:op.beforeRow,currentStitch:op.beforeStitch,updatedAt:now});await db.counterOperations.update(op.id,{undone:true});await db.countHistory.add({id:id(),projectId:project.id,createdAt:now,kind:'undo',label:'↩︎ 取り消し',beforeRow:op.afterRow,beforeStitch:op.afterStitch,afterRow:op.beforeRow,afterStitch:op.beforeStitch})});await loadProjects();await loadProjectData(project.id)}
+  async function saveSettings(next:CounterSettings){if(!project)return;await db.projects.update(project.id,{counterSettings:next,updatedAt:new Date().toISOString()});await loadProjects();setScreen('counter')}
+  async function timer(action:'start'|'pause'|'resume'|'end'|'hide'){if(!project)return;const now=new Date(), nowIso=now.toISOString(), old=project.timer;let next:TimerState|undefined=old;if(action==='start')next={state:'running',startedAt:nowIso,resumedAt:nowIso,accumulatedSeconds:0,hidden:false};if(old&&action==='pause')next={...old,state:'paused',accumulatedSeconds:elapsed(old,now),resumedAt:null};if(old&&action==='resume')next={...old,state:'running',resumedAt:nowIso};if(old&&action==='hide')next={...old,hidden:!old.hidden};if(old&&action==='end'){const seconds=elapsed(old,now);await db.workLogs.add({id:id(),projectId:project.id,startedAt:old.startedAt,endedAt:nowIso,durationSeconds:seconds});next=undefined}await db.projects.update(project.id,{timer:next,updatedAt:nowIso});await loadProjects()}
+  async function complete(){if(!project)return;if(!confirm('この作品を完成として記録しますか？'))return;await db.projects.update(project.id,{status:'completed',completedAt:new Date().toISOString(),updatedAt:new Date().toISOString()});await loadProjects();setScreen('projects')}
+  const inProgress=projects.filter(x=>x.status==='in-progress'), completed=projects.filter(x=>x.status==='completed')
+  return <div className="app-shell">{screen==='home'&&<Home projects={inProgress} add={newProject} open={(x)=>openProject(x)} all={()=>setScreen('projects')}/>} {screen==='projects'&&<Projects active={inProgress} completed={completed} add={newProject} open={(x)=>openProject(x)} back={()=>setScreen('home')}/>} {screen==='new-project'&&<NewProject draft={draft} setDraft={setDraft} files={fileUrls} choose={(e)=>{setFiles(x=>[...x,...Array.from(e.target.files??[]).filter(f=>f.type.startsWith('image/'))]);e.target.value=''}} remove={(i)=>setFiles(x=>x.filter((_,j)=>j!==i))} submit={saveProject} cancel={()=>setScreen('home')} notice={notice}/>} {screen==='project'&&project&&<ProjectPage p={project} photos={photoUrls} back={()=>setScreen('projects')} counter={()=>setScreen('counter')} complete={complete}/>} {screen==='counter'&&project&&<Counter p={project} history={history.slice(-3).reverse()} back={()=>setScreen('project')} settings={()=>setScreen('settings')} allHistory={()=>setScreen('history')} count={applyCount} undo={undo} timer={timer} notice={notice} />} {screen==='settings'&&project&&<Settings p={project} back={()=>setScreen('counter')} save={saveSettings}/>} {screen==='history'&&project&&<History items={history} back={()=>setScreen('counter')}/>} {pending&&<ConfirmMove data={pending} cancel={()=>setPending(null)} proceed={()=>{const x=pending;setPending(null);void commitCount('stitch',x.amount,x.beforeRow,x.beforeStitch,x.afterRow,x.afterStitch,x.rows)}}/>}</div>
 }
 
-function HomeScreen({ projects, onAddProject, onOpenProjects, onOpenProject }: { projects: Project[]; onAddProject: () => void; onOpenProjects: () => void; onOpenProject: (id: string) => void }) {
-  return <main className="page home-page">
-    <header className="home-header"><p>個人用 編み物制作管理</p><h1>編みもの記録</h1></header>
-    <button className="primary-button" type="button" onClick={onAddProject}>＋ 新しい作品を登録</button>
-    <section className="section"><div className="section-heading"><h2>制作中</h2><button className="text-button" type="button" onClick={onOpenProjects}>すべて見る</button></div>
-      {projects.length === 0 ? <div className="empty-card"><span>🧶</span><p>まだ作品がありません</p><small>「新しい作品を登録」から始めましょう。</small></div> : <div className="project-list">{projects.slice(0, 3).map((project) => <ProjectCard key={project.id} project={project} onOpen={onOpenProject} />)}</div>}
-    </section>
-  </main>
-}
-
-function ProjectsScreen({ projects, onBack, onAddProject, onOpenProject }: { projects: Project[]; onBack: () => void; onAddProject: () => void; onOpenProject: (id: string) => void }) {
-  return <main className="page"><Header title="制作中の作品" onBack={onBack} /><button className="primary-button" type="button" onClick={onAddProject}>＋ 新しい作品を登録</button><section className="section">{projects.length === 0 ? <div className="empty-card"><span>🧶</span><p>まだ作品がありません</p></div> : <div className="project-list">{projects.map((project) => <ProjectCard key={project.id} project={project} onOpen={onOpenProject} />)}</div>}</section></main>
-}
-
-function ProjectCard({ project, onOpen }: { project: Project; onOpen: (id: string) => void }) {
-  return <button className="project-card" type="button" onClick={() => onOpen(project.id)}><span className="project-card-icon">🧶</span><span className="project-card-body"><strong>{project.title}</strong><small>{project.nextAction ? `次にやること：${project.nextAction}` : '制作を始める準備ができました'}</small></span><span aria-hidden="true">›</span></button>
-}
-
-function NewProjectScreen({ draft, files, isSaving, notice, onCancel, onSubmit, onUpdate, onSelectPhotos, onRemovePhoto }: { draft: DraftProject; files: { file: File; url: string }[]; isSaving: boolean; notice: string; onCancel: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void; onUpdate: <Key extends keyof DraftProject>(key: Key, value: DraftProject[Key]) => void; onSelectPhotos: (event: ChangeEvent<HTMLInputElement>) => void; onRemovePhoto: (index: number) => void }) {
-  return <main className="page form-page"><Header title="新しい作品" onBack={onCancel} backLabel="キャンセル" /><form onSubmit={onSubmit}>
-    <section className="form-section"><label className="field-label" htmlFor="title">作品名 <span>必須</span></label><input id="title" value={draft.title} onChange={(event) => onUpdate('title', event.target.value)} placeholder="例：春色のショール" autoFocus /></section>
-    <section className="form-section"><p className="field-label">作品写真 <span>任意・複数可</span></p><div className="photo-grid">{files.map(({ file, url }, index) => <div className="photo-preview" key={`${file.name}-${index}`}><img src={url} alt="追加する作品写真" /><button type="button" aria-label={`${file.name}を取り除く`} onClick={() => onRemovePhoto(index)}>×</button></div>)}<label className="add-photo"><input type="file" accept="image/*" multiple onChange={onSelectPhotos} />＋<small>写真を追加</small></label></div></section>
-    <section className="form-section"><div className="two-fields"><NumberField label="目標段数" value={draft.targetRow} onChange={(value) => onUpdate('targetRow', value)} suffix="段" /><NumberField label="目標目数" value={draft.targetStitch} onChange={(value) => onUpdate('targetStitch', value)} suffix="目" /></div><label className={`switch-row${draft.targetStitch ? '' : ' is-disabled'}`}><span><strong>目標目数で自動段送り</strong><small>目標目数に達すると、自動で次の段へ進みます</small></span><input type="checkbox" checked={draft.autoAdvanceAtTargetStitch} disabled={!draft.targetStitch} onChange={(event) => onUpdate('autoAdvanceAtTargetStitch', event.target.checked)} /><i aria-hidden="true" /></label></section>
-    <section className="form-section compact"><button type="button" className="disclosure" onClick={() => onUpdate('registerInProgress', !draft.registerInProgress)}><span>{draft.registerInProgress ? '⌄' : '›'}</span> 途中から登録する</button>{draft.registerInProgress && <div className="two-fields disclosure-content"><NumberField label="開始段数" value={draft.currentRow} onChange={(value) => onUpdate('currentRow', value)} suffix="段" /><NumberField label="現在の目数" value={draft.currentStitch} onChange={(value) => onUpdate('currentStitch', value)} suffix="目" /></div>}</section>
-    <section className="form-section"><label className="field-label" htmlFor="memo">メモ <span>任意</span></label><textarea id="memo" value={draft.memo} onChange={(event) => onUpdate('memo', event.target.value)} placeholder="糸や編み方などを記録できます" rows={4} /></section>
-    <section className="form-section"><label className="field-label" htmlFor="next-action">次にやること <span>任意</span></label><input id="next-action" value={draft.nextAction} onChange={(event) => onUpdate('nextAction', event.target.value)} placeholder="例：3段目を編む" /></section>
-    {notice && <p className="notice" role="alert">{notice}</p>}<button className="primary-button create-button" disabled={isSaving} type="submit">{isSaving ? '保存中…' : 'この作品を作成'}</button>
-  </form></main>
-}
-
-function ProjectScreen({ project, photos, onBack }: { project: Project; photos: { photo: ProjectPhoto; url: string }[]; onBack: () => void }) {
-  return <main className="page"><Header title="作品" onBack={onBack} /><section className="project-summary"><div className="summary-icon">🧶</div><h1>{project.title}</h1>{photos.length > 0 && <div className="saved-photos">{photos.map(({ photo, url }) => <img key={photo.id} src={url} alt={`${project.title}の作品写真`} />)}</div>}<dl><div><dt>現在</dt><dd>{project.currentRow}段・{project.currentStitch}目</dd></div>{project.targetRow !== null && <div><dt>目標段数</dt><dd>{project.targetRow}段</dd></div>}{project.targetStitch !== null && <div><dt>目標目数</dt><dd>{project.targetStitch}目{project.autoAdvanceAtTargetStitch ? '（自動段送りON）' : ''}</dd></div>}{project.nextAction && <div><dt>次にやること</dt><dd>{project.nextAction}</dd></div>}{project.memo && <div><dt>メモ</dt><dd>{project.memo}</dd></div>}</dl><p className="coming-soon">カウンターなどの制作機能は次の段階で追加します。</p></section></main>
-}
-
-function Header({ title, onBack, backLabel = '＜ 戻る' }: { title: string; onBack: () => void; backLabel?: string }) { return <header className="page-header"><button type="button" className="back-button" onClick={onBack}>{backLabel}</button><h1>{title}</h1><span aria-hidden="true" /></header> }
-
-function NumberField({ label, value, onChange, suffix }: { label: string; value: string; onChange: (value: string) => void; suffix: string }) { return <label className="number-field"><span>{label}<small>任意</small></span><span className="number-input"><input type="number" min="0" inputMode="numeric" value={value} onChange={(event) => onChange(event.target.value)} /><em>{suffix}</em></span></label> }
-
-function parseOptionalNumber(value: string) { return value === '' ? null : parseCount(value) }
-function parseCount(value: string) { return Math.max(0, Number.parseInt(value, 10) || 0) }
-
+const Header=({title,back,right}:{title:string;back:()=>void;right?:React.ReactNode})=><header className="page-header"><button className="back-button" onClick={back}>＜ 戻る</button><h1>{title}</h1><span>{right}</span></header>
+function Home({projects,add,open,all}:{projects:Project[];add:()=>void;open:(id:string)=>void;all:()=>void}){return <main className="page home-page"><header className="home-header"><p>個人用 編み物制作管理</p><h1>編みもの記録</h1></header><button className="primary-button" onClick={add}>＋ 新しい作品を登録</button><section className="section"><div className="section-heading"><h2>制作中</h2><button className="text-button" onClick={all}>すべて見る</button></div><Cards projects={projects.slice(0,3)} open={open}/></section></main>}
+function Cards({projects,open}:{projects:Project[];open:(id:string)=>void}){return projects.length?<div className="project-list">{projects.map(p=><button className="project-card" key={p.id} onClick={()=>open(p.id)}><span className="project-card-icon">🧶</span><span className="project-card-body"><strong>{p.title}</strong><small>{p.nextAction||'制作を始める準備ができました'}</small></span><span>›</span></button>)}</div>:<div className="empty-card"><span>🧶</span><p>まだ作品がありません</p><small>「新しい作品を登録」から始めましょう。</small></div>}
+function Projects({active,completed,add,open,back}:{active:Project[];completed:Project[];add:()=>void;open:(id:string)=>void;back:()=>void}){return <main className="page"><Header title="作品" back={back}/><button className="primary-button" onClick={add}>＋ 新しい作品を登録</button><section className="section"><h2>制作中</h2><Cards projects={active} open={open}/></section>{completed.length>0&&<section className="section"><h2>完成作品</h2><Cards projects={completed} open={open}/></section>}</main>}
+function NewProject({draft,setDraft,files,choose,remove,submit,cancel,notice}:{draft:Draft;setDraft:React.Dispatch<React.SetStateAction<Draft>>;files:{file:File;url:string}[];choose:(e:ChangeEvent<HTMLInputElement>)=>void;remove:(i:number)=>void;submit:(e:FormEvent)=>void;cancel:()=>void;notice:string}){const u=<K extends keyof Draft>(k:K,v:Draft[K])=>setDraft(x=>({...x,[k]:v}));return <main className="page form-page"><Header title="新しい作品" back={cancel}/><form onSubmit={submit}><section className="form-section"><label className="field-label">作品名 <span>必須</span><input value={draft.title} onChange={e=>u('title',e.target.value)} placeholder="例：春色のショール" autoFocus/></label></section><section className="form-section"><p className="field-label">作品写真 <span>任意・複数可</span></p><div className="photo-grid">{files.map((x,i)=><div className="photo-preview" key={x.url}><img src={x.url}/><button type="button" onClick={()=>remove(i)}>×</button></div>)}<label className="add-photo">＋<small>写真を追加</small><input type="file" accept="image/*" multiple onChange={choose}/></label></div></section><section className="form-section"><div className="two-fields"><NumberField label="目標段数" value={draft.targetRow} set={v=>u('targetRow',v)} unit="段"/><NumberField label="目標目数" value={draft.targetStitch} set={v=>u('targetStitch',v)} unit="目"/></div><label className={'switch-row '+(!draft.targetStitch?'is-disabled':'')}><span><strong>目標目数で自動段送り</strong><small>目標目数に達すると、自動で次の段へ進みます</small></span><input type="checkbox" disabled={!draft.targetStitch} checked={draft.auto} onChange={e=>u('auto',e.target.checked)}/><i/></label></section><section className="form-section compact"><button className="disclosure" type="button" onClick={()=>u('midway',!draft.midway)}>› 途中から登録する</button>{draft.midway&&<><p className="hint">今編んでいる段を入力してください。</p><div className="two-fields"><NumberField label="現在の段" value={draft.row} set={v=>u('row',v)} unit="段目"/><NumberField label="現在の目数" value={draft.stitch} set={v=>u('stitch',v)} unit="目"/></div></>}</section><section className="form-section"><label className="field-label">メモ <textarea value={draft.memo} onChange={e=>u('memo',e.target.value)} rows={3}/></label></section><section className="form-section"><label className="field-label">次にやること <input value={draft.next} onChange={e=>u('next',e.target.value)}/></label></section>{notice&&<p className="notice">{notice}</p>}<button className="primary-button create-button">この作品を作成</button></form></main>}
+const NumberField=({label,value,set,unit}:{label:string;value:string;set:(v:string)=>void;unit:string})=><label className="number-field"><span>{label}<small>任意</small></span><span className="number-input"><input type="number" min="0" value={value} onChange={e=>set(e.target.value)}/><em>{unit}</em></span></label>
+function ProjectPage({p,photos,back,counter,complete}:{p:Project;photos:{photo:ProjectPhoto;url:string}[];back:()=>void;counter:()=>void;complete:()=>void}){return <main className="page"><Header title="作品" back={back}/><section className="project-summary"><div className="summary-icon">🧶</div><h1>{p.title}</h1>{photos.length>0&&<div className="saved-photos">{photos.map(x=><img key={x.photo.id} src={x.url}/>)}</div>}<button className="primary-button" onClick={counter}>カウンターを開く</button><dl><div><dt>現在</dt><dd>{p.currentRow}段目・{p.currentStitch}目</dd></div>{p.nextAction&&<div><dt>次にやること</dt><dd>{p.nextAction}</dd></div>}{p.memo&&<div><dt>メモ</dt><dd>{p.memo}</dd></div>}</dl>{p.status==='in-progress'?<button className="complete-button" onClick={complete}>完成にする</button>:<p className="complete-status">完成日：{formatDate(p.completedAt!)}</p>}</section></main>}
+function Counter({p,history,back,settings,allHistory,count,undo,timer,notice}:{p:Project;history:CountHistory[];back:()=>void;settings:()=>void;allHistory:()=>void;count:(k:'row'|'stitch',a:number)=>void;undo:()=>void;timer:(x:'start'|'pause'|'resume'|'end'|'hide')=>void;notice:string}){const s=settingsOf(p);return <main className="page counter-page"><Header title={p.title} back={back} right={<button className="gear" onClick={settings} aria-label="カウンター設定">⚙︎</button>}/><div className="counter-grid"><CounterUnit title="段" current={p.currentRow} target={p.targetRow} plus={s.rowIncrease} minus={s.rowDecrease} act={a=>count('row',a)}/><CounterUnit title="目" current={p.currentStitch} target={p.targetStitch} plus={s.stitchIncrease} minus={s.stitchDecrease} act={a=>count('stitch',a)}/></div><button className="undo-button" onClick={undo}>↩︎ ひとつ戻す</button>{notice&&<p className="timer-notice">{notice}</p>}<Timer timer={p.timer} act={timer}/><section className="recent"><div className="section-heading"><h2>最近のカウント</h2><button className="text-button" onClick={allHistory}>すべて見る</button></div>{history.length?<div className="history-list">{history.map(h=><HistoryRow key={h.id} h={h}/>)}</div>:<p className="muted">まだ操作履歴がありません</p>}</section></main>}
+function CounterUnit({title,current,target,plus,minus,act}:{title:string;current:number;target:number|null;plus:number[];minus:number[];act:(n:number)=>void}){const [adjust,setAdjust]=useState(false);return <section className="counter-unit"><h2>{title}</h2><p className="count-value">{target!==null?<><b>{current}</b><span>/ {target}{title==='段'?'':'目'}</span></>:<><b>{current}</b><span>{title==='段'?'段目':'目'}</span></>}</p><div className="count-buttons">{plus.map(v=><button key={v} className={v===1?'main-count':''} onClick={()=>act(v)}>+{v}</button>)}</div><button className="adjust-toggle" onClick={()=>setAdjust(!adjust)}>調整 {adjust?'⌃':'⌄'}</button>{adjust&&<div className="adjust-buttons">{minus.map(v=><button key={v} onClick={()=>act(-v)}>−{v}</button>)}</div>}</section>}
+function Timer({timer,act}:{timer?:TimerState;act:(x:'start'|'pause'|'resume'|'end'|'hide')=>void}){const [now,setNow]=useState(()=>Date.now());useEffect(()=>{const t=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(t)},[]);if(!timer)return <section className="timer-card"><div><small>制作タイマー</small><strong>00:00:00</strong></div><button onClick={()=>act('start')}>開始</button></section>;const seconds=elapsed(timer,new Date(now));return <section className="timer-card"><div>{timer.hidden?<><small>制作タイマー</small><strong>{timer.state==='running'?'⏱ 計測中':'一時停止中'}</strong></>:<><small>制作タイマー</small><strong>{clock(seconds)}</strong></>}</div><div className="timer-actions">{timer.state==='running'?<button onClick={()=>act('pause')}>一時停止</button>:<button onClick={()=>act('resume')}>再開</button>}<button onClick={()=>act('end')}>終了</button><button className="icon-button" onClick={()=>act('hide')}>{timer.hidden?'表示':'隠す'}</button></div></section>}
+function Settings({p,back,save}:{p:Project;back:()=>void;save:(x:CounterSettings)=>void}){const [s,setS]=useState<CounterSettings>({...settingsOf(p),rowIncrease:[...settingsOf(p).rowIncrease],rowDecrease:[...settingsOf(p).rowDecrease],stitchIncrease:[...settingsOf(p).stitchIncrease],stitchDecrease:[...settingsOf(p).stitchDecrease]});return <main className="page"><Header title="カウンター設定" back={back}/><p className="settings-intro">この作品だけのカウントボタンを設定します。</p><SettingGroup title="段：増やす" values={s.rowIncrease} update={v=>setS(x=>({...x,rowIncrease:v}))}/><SettingGroup title="段：調整" values={s.rowDecrease} update={v=>setS(x=>({...x,rowDecrease:v}))}/><SettingGroup title="目：増やす" values={s.stitchIncrease} update={v=>setS(x=>({...x,stitchIncrease:v}))}/><SettingGroup title="目：調整" values={s.stitchDecrease} update={v=>setS(x=>({...x,stitchDecrease:v}))}/><button className="primary-button" onClick={()=>save(s)}>設定を保存</button></main>}
+function SettingGroup({title,values,update}:{title:string;values:number[];update:(x:number[])=>void}){const [input,setInput]=useState('');const add=()=>{const v=n(input);if(v>0&&!values.includes(v))update([...values,v]);setInput('')};return <section className="setting-group"><h2>{title}</h2>{values.map((v,i)=><div className="setting-row" key={`${v}-${i}`}><strong>{title.includes('調整')?'−':'+'}{v}</strong><span><button disabled={!i} onClick={()=>update(values.map((x,j)=>j===i-1?v:j===i?values[i-1]:x))}>↑</button><button disabled={i===values.length-1} onClick={()=>update(values.map((x,j)=>j===i+1?v:j===i?values[i+1]:x))}>↓</button><button onClick={()=>update(values.filter((_,j)=>j!==i))}>削除</button></span></div>)}<div className="add-custom"><input type="number" min="1" value={input} placeholder="数値" onChange={e=>setInput(e.target.value)}/><button onClick={add}>追加</button></div></section>}
+function History({items,back}:{items:CountHistory[];back:()=>void}){const byDay=items.reduce<Record<string,CountHistory[]>>((a,x)=>{const d=formatDate(x.createdAt);(a[d]??=[]).push(x);return a},{});return <main className="page"><Header title="カウント履歴" back={back}/>{Object.entries(byDay).sort(([a],[b])=>b.localeCompare(a)).map(([day,list])=><section className="history-day" key={day}><h2>{day}</h2><div className="history-list">{[...list].reverse().map(h=><HistoryRow h={h} key={h.id}/>)}</div></section>)}</main>}
+const HistoryRow=({h}:{h:CountHistory})=><div className="history-row"><time>{new Date(h.createdAt).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}</time><span><strong>{h.label}</strong><small>{h.beforeRow!==h.afterRow?`${h.beforeRow}段目 → ${h.afterRow}段目 ／ ${h.beforeStitch}目 → ${h.afterStitch}目`:`${h.beforeStitch} → ${h.afterStitch}目`}</small></span></div>
+const ConfirmMove=({data,cancel,proceed}:{data:{beforeRow:number;beforeStitch:number;afterRow:number;afterStitch:number;rows:number};cancel:()=>void;proceed:()=>void})=><div className="modal"><div><h2>{data.rows}段分進みます</h2><p>{data.beforeRow}段目 → {data.afterRow}段目<br/>目数 {data.beforeStitch}目 → {data.afterStitch}目</p><button className="primary-button" onClick={proceed}>進める</button><button className="text-button modal-cancel" onClick={cancel}>キャンセル</button></div></div>
+function elapsed(t:TimerState,now:Date){return t.accumulatedSeconds+(t.state==='running'&&t.resumedAt?Math.max(0,Math.floor((now.getTime()-new Date(t.resumedAt).getTime())/1000)):0)}
+const clock=(s:number)=>[Math.floor(s/3600),Math.floor(s%3600/60),s%60].map(x=>String(x).padStart(2,'0')).join(':')
+const formatDate=(v:string)=>new Date(v).toLocaleDateString('ja-JP',{month:'numeric',day:'numeric'})
 export default App
