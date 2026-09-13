@@ -76,4 +76,7 @@ export type ProjectPhoto = {
   blob: Blob
   fileName: string
   createdAt: string
+  sortOrder?: number
+  isMain?: boolean
+  memo?: string
 }

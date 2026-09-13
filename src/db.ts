@@ -26,4 +26,24 @@ db.version(2).stores({
   })
 })
 
+db.version(3).stores({
+  projects: 'id, status, createdAt, updatedAt',
+  projectPhotos: 'id, projectId, createdAt, [projectId+sortOrder]',
+  countHistory: 'id, projectId, createdAt',
+  counterOperations: 'id, projectId, createdAt, undone',
+  workLogs: 'id, projectId, startedAt, endedAt',
+}).upgrade(async (transaction) => {
+  const photos = await transaction.table('projectPhotos').toArray() as ProjectPhoto[]
+  const grouped = new Map<string, ProjectPhoto[]>()
+  photos.forEach((photo) => grouped.set(photo.projectId, [...(grouped.get(photo.projectId) ?? []), photo]))
+  await Promise.all([...grouped.values()].map(async (projectPhotos) => {
+    const ordered = [...projectPhotos].sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+    await Promise.all(ordered.map((photo, index) => transaction.table('projectPhotos').update(photo.id, {
+      sortOrder: index,
+      isMain: index === 0,
+      memo: photo.memo ?? '',
+    })))
+  }))
+})
+
 export { db }
