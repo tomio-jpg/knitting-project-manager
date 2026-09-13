@@ -80,6 +80,14 @@ textarea { line-height: 1.6; resize: vertical; }
 .hint,.settings-intro,.muted { color:#887a74; font-size:13px; line-height:1.6; }
 .complete-button { background:transparent; border:1px solid #c78478; border-radius:12px; color:#a66258; font:inherit; margin-top:22px; min-height:46px; width:100%; }
 .complete-status { color:#80615a; font-size:14px; margin-top:22px; }
+.completion-record { padding-top:28px; text-align:center; }
+.completion-mark { align-items:center; background:#f3e8e1; border-radius:50%; color:#b67a6c; display:inline-flex; font-size:28px; height:62px; justify-content:center; width:62px; }
+.completion-message { color:#a66258; font-size:15px; font-weight:700; margin:14px 0 7px; }
+.completion-record h1 { color:#403633; font-size:26px; margin-bottom:24px; }
+.completion-record dl { background:#fff; border:1px solid #eee3dc; border-radius:16px; margin:0 0 24px; text-align:left; }
+.completion-record dl div { border-bottom:1px solid #f0e7e1; display:grid; gap:5px; padding:15px; }
+.completion-record dl div:last-child { border-bottom:0; }
+.completion-record dt { color:#907c75; font-size:12px; }.completion-record dd { color:#514440; font-size:16px; margin:0; }
 .gear { background:transparent; border:0; color:#80615a; font-size:25px; padding:7px; }
 .counter-page { padding-left:14px; padding-right:14px; }
 .counter-grid { display:grid; gap:10px; grid-template-columns:1fr 1fr; }
