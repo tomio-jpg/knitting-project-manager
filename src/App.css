@@ -45,10 +45,6 @@ textarea { line-height: 1.6; resize: vertical; }
 .add-photo { align-items: center; background: #fbf4ef; border: 1px dashed #c9aaa0; color: #9a6c60; display: flex; flex-direction: column; font-size: 25px; justify-content: center; }
 .add-photo small { font-size: 10px; margin-top: 4px; }
 .add-photo input { height: 1px; opacity: 0; position: absolute; width: 1px; }
-.photo-preview-error { align-items:center; color:#9a463a; display:flex; font-size:30px; height:100%; justify-content:center; }
-/* 診断用: 原因特定後にこのブロックとphoto-diagnosticの表示を削除します。 */
-.photo-diagnostic { background:#fff8d8; border:1px solid #e4c964; border-radius:12px; color:#5e5120; font-size:12px; line-height:1.55; margin-top:14px; padding:12px; }
-.photo-diagnostic strong { display:block; font-size:13px; margin-bottom:5px; }.photo-diagnostic p { margin:4px 0 9px; }.photo-diagnostic div { border-top:1px solid #eadb9a; margin-top:8px; padding-top:8px; }.photo-diagnostic b,.photo-diagnostic small { display:block; }.photo-diagnostic small { margin-top:3px; word-break:break-word; }
 .two-fields { display: grid; gap: 14px; grid-template-columns: 1fr 1fr; }
 .number-input { align-items: center; display: flex; position: relative; }
 .number-input input { padding-right: 35px; }
